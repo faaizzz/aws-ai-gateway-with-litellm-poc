@@ -1,0 +1,16 @@
+# Platform-owned WAF settings for the LLM gateway ALB (read by
+# terraform/modules/llm-gateway/waf.tf). Edit, open a PR, apply via Actions.
+#
+# AWS WAF rate rules count requests per client IP over a rolling 10-minute
+# window (minimum limit 10). They cannot express a daily quota; that belongs in
+# LiteLLM per-key limits.
+rateLimit:
+  windowSeconds: 600 # fixed: 60, 120, 300 or 600
+  defaultPerWindow: 50 # every IP not listed under trustedCidrs
+  trustedPerWindow: 1000 # a higher limit for trustedCidrs, not an exemption
+
+# IPv4 CIDRs that get trustedPerWindow. A residential IP can change; if it does
+# the address silently falls back to defaultPerWindow until updated here.
+trustedCidrs:
+  - cidr: 203.0.113.10/32 # placeholder (RFC 5737 documentation range): replace with your IP
+    note: operator workstation

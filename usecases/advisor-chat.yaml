@@ -1,0 +1,23 @@
+# Product team's entire self-service contract for this use case.
+
+apiVersion: ai-platform.example.com/v1
+kind: AIUseCase
+
+metadata:
+  id: advisor-chat
+  owner: advisor-platform
+  team: advisor            # canonical team identifier; see terraform/modules/use-case/README.md
+                            # for the mapping from historical data's "AdvisorChat" label
+
+spec:
+  dataClassification: confidential
+
+  modelRoute: anthropic-claude-sonnet-bedrock
+
+  budget:
+    monthlyUsd: 10000       # ASSUMPTION: ~12% above the observed $8,915.04 30-day
+                            # spend in data/sample_spend_30d.csv. Not an approved business
+                            # budget — see README.md "Budget model".
+
+  observability:
+    tier: standard

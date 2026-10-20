@@ -1,0 +1,286 @@
+{
+  "_note": "Synthetic, illustrative LiteLLM -> Langfuse observations. Not real data.",
+  "data": [
+    {
+      "id": "obs-6513270e-269e-0d37-f2a7-4de452e6b438",
+      "traceId": "trace-d23f0824-128b-2f33-0c5c-7fd0a6a3a450",
+      "parentObservationId": null,
+      "type": "GENERATION",
+      "name": "litellm-completion",
+      "startTime": "2026-03-12T10:02:11.120Z",
+      "completionStartTime": "2026-03-12T10:02:11.510Z",
+      "endTime": "2026-03-12T10:02:12.970Z",
+      "level": "DEFAULT",
+      "statusMessage": "",
+      "environment": "production",
+      "version": "1.50.0",
+      "bookmarked": false,
+      "public": false,
+      "createdAt": "2026-03-12T10:02:11.120Z",
+      "updatedAt": "2026-03-12T10:02:12.970Z",
+      "traceName": "advisorchat-turn",
+      "traceMetadata": {
+        "team": "AdvisorChat",
+        "product": "chat",
+        "env": "prod",
+        "data_class": "pii_sensitive"
+      },
+      "traceTags": [
+        "streaming",
+        "rag"
+      ],
+      "input": "[{\"role\": \"system\", \"content\": \"You are a help-centre assistant for a fictional savings app. Answer from the provided context only.\"}, {\"role\": \"user\", \"content\": \"How do I change the date my monthly savings plan runs?\"}]",
+      "output": "{\"role\": \"assistant\", \"content\": \"Open the savings plan, choose Edit, and pick a new execution day. The change applies from the next cycle.\"}",
+      "metadata": {
+        "litellm_call_id": "9531985d-5d9d-c9f8-1818-e811892f902b",
+        "litellm_proxy_key_alias": "key-advisorchat-prod",
+        "request_id": "req-36f675cc-81e7-4ef5-e8e2-5d940ed90475"
+      },
+      "providedModelName": "claude-sonnet-4-6",
+      "internalModelId": "eu.anthropic.claude-sonnet-4-6",
+      "modelParameters": {
+        "temperature": 0.2,
+        "max_tokens": 1024,
+        "stream": true
+      },
+      "usageDetails": {
+        "input": 540,
+        "output": 61,
+        "total": 601
+      },
+      "inputUsage": 540,
+      "outputUsage": 61,
+      "totalUsage": 601,
+      "costDetails": {
+        "input": 0.00162,
+        "output": 0.000915,
+        "total": 0.002535
+      }
+    },
+    {
+      "id": "obs-6b0d549b-6f03-675a-1600-a35a099950d8",
+      "traceId": "trace-8d116ece-1738-f7d9-3d9c-172411e20b8f",
+      "parentObservationId": null,
+      "type": "GENERATION",
+      "name": "litellm-completion",
+      "startTime": "2026-03-12T10:02:40.402Z",
+      "completionStartTime": "2026-03-12T10:02:40.757Z",
+      "endTime": "2026-03-12T10:02:42.612Z",
+      "level": "DEFAULT",
+      "statusMessage": "",
+      "environment": "production",
+      "version": "1.50.0",
+      "bookmarked": false,
+      "public": false,
+      "createdAt": "2026-03-12T10:02:40.402Z",
+      "updatedAt": "2026-03-12T10:02:42.612Z",
+      "traceName": "advisorchat-turn",
+      "traceMetadata": {
+        "team": "AdvisorChat",
+        "product": "chat",
+        "env": "prod",
+        "data_class": "pii_sensitive"
+      },
+      "traceTags": [
+        "streaming",
+        "rag"
+      ],
+      "input": "[{\"role\": \"system\", \"content\": \"You are a help-centre assistant for a fictional savings app. Answer from the provided context only.\"}, {\"role\": \"user\", \"content\": \"And can I pause it for two months?\"}]",
+      "output": "{\"role\": \"assistant\", \"content\": \"Yes. Choose Pause, set a resume date, and no executions happen until then.\"}",
+      "metadata": {
+        "litellm_call_id": "90c192cf-d3ac-94af-0f21-ddb66cad4a26",
+        "litellm_proxy_key_alias": "key-advisorchat-prod",
+        "request_id": "req-a170b338-3926-3059-f28c-105d1fb17c23"
+      },
+      "providedModelName": "claude-sonnet-4-6",
+      "internalModelId": "eu.anthropic.claude-sonnet-4-6",
+      "modelParameters": {
+        "temperature": 0.2,
+        "max_tokens": 1024,
+        "stream": true
+      },
+      "usageDetails": {
+        "input": 1210,
+        "output": 48,
+        "cache_read_input_tokens": 2986,
+        "total": 4244
+      },
+      "inputUsage": 1210,
+      "outputUsage": 48,
+      "totalUsage": 4244,
+      "costDetails": {
+        "input": 0.000318,
+        "cache_read": 0.000896,
+        "output": 0.00072,
+        "total": 0.001934
+      }
+    },
+    {
+      "id": "obs-0fd630f1-f29d-0da9-953f-48f1a09f76b5",
+      "traceId": "trace-0cb1e29c-658c-da14-95e6-0af593bd04cf",
+      "parentObservationId": null,
+      "type": "GENERATION",
+      "name": "litellm-completion",
+      "startTime": "2026-03-12T10:05:03.877Z",
+      "completionStartTime": null,
+      "endTime": "2026-03-12T10:05:05.081Z",
+      "level": "ERROR",
+      "statusMessage": "throttling_exception: Too many requests for model anthropic.claude-sonnet-4-6 in region eu-central-1",
+      "environment": "production",
+      "version": "1.50.0",
+      "bookmarked": false,
+      "public": false,
+      "createdAt": "2026-03-12T10:05:03.877Z",
+      "updatedAt": "2026-03-12T10:05:05.081Z",
+      "traceName": "kyc-document-check",
+      "traceMetadata": {
+        "team": "KYC",
+        "product": "onboarding",
+        "env": "prod",
+        "data_class": "pii_sensitive"
+      },
+      "traceTags": [],
+      "input": "[{\"role\": \"user\", \"content\": \"Extract name, date of birth and document number from the attached (synthetic) ID scan.\"}]",
+      "output": null,
+      "metadata": {
+        "litellm_call_id": "8e81973e-0bec-d7b0-3898-d190f9ebdacc",
+        "litellm_proxy_key_alias": "key-kyc-prod",
+        "request_id": "req-6b4cb242-4a23-d596-2217-beaddbc496cb"
+      },
+      "providedModelName": "claude-sonnet-4-6",
+      "internalModelId": "eu.anthropic.claude-sonnet-4-6",
+      "modelParameters": {
+        "temperature": 0.2,
+        "max_tokens": 1024,
+        "stream": true
+      },
+      "usageDetails": {
+        "input": 2890,
+        "output": 0,
+        "total": 2890
+      },
+      "inputUsage": 2890,
+      "outputUsage": 0,
+      "totalUsage": 2890,
+      "costDetails": {
+        "input": 0.0,
+        "output": 0.0,
+        "total": 0.0
+      }
+    },
+    {
+      "id": "obs-92276658-1e27-a1c0-8a6a-63ec24ede6a4",
+      "traceId": "trace-ae97ba94-d0ed-a82f-8f6d-05584ef8aa38",
+      "parentObservationId": null,
+      "type": "GENERATION",
+      "name": "litellm-completion",
+      "startTime": "2026-03-12T10:06:30.015Z",
+      "completionStartTime": "2026-03-12T10:06:30.295Z",
+      "endTime": "2026-03-12T10:06:33.035Z",
+      "level": "DEFAULT",
+      "statusMessage": "",
+      "environment": "production",
+      "version": "1.50.0",
+      "bookmarked": false,
+      "public": false,
+      "createdAt": "2026-03-12T10:06:30.015Z",
+      "updatedAt": "2026-03-12T10:06:33.035Z",
+      "traceName": "digest-summary",
+      "traceMetadata": {
+        "team": "DigestBot",
+        "product": "digest",
+        "env": "prod",
+        "data_class": "no_pii"
+      },
+      "traceTags": [
+        "batch"
+      ],
+      "input": "[{\"role\": \"user\", \"content\": \"Summarise today's public market headlines in five bullet points.\"}]",
+      "output": "{\"role\": \"assistant\", \"content\": \"- Indices closed slightly higher\\n- Energy led gains\\n- Bond yields eased\\n- Tech was mixed\\n- Volatility stayed low\"}",
+      "metadata": {
+        "litellm_call_id": "923a7369-94e3-bf91-1a61-dbe22e44158b",
+        "litellm_proxy_key_alias": "key-digestbot-prod",
+        "request_id": "req-18f135d2-5f55-7203-3018-50c5a38fd547"
+      },
+      "providedModelName": "claude-haiku-4-5",
+      "internalModelId": "eu.anthropic.claude-haiku-4-5",
+      "modelParameters": {
+        "temperature": 0.2,
+        "max_tokens": 1024,
+        "stream": true
+      },
+      "usageDetails": {
+        "input": 3410,
+        "output": 170,
+        "total": 3580
+      },
+      "inputUsage": 3410,
+      "outputUsage": 170,
+      "totalUsage": 3580,
+      "costDetails": {
+        "input": 0.00341,
+        "output": 0.00085,
+        "total": 0.00426
+      }
+    },
+    {
+      "id": "obs-907a70c3-1012-f037-b64c-e4228c38fb29",
+      "traceId": "trace-7f150524-34b9-b5df-9e77-69b10f4205b4",
+      "parentObservationId": null,
+      "type": "GENERATION",
+      "name": "litellm-completion",
+      "startTime": "2026-03-12T10:07:12.660Z",
+      "completionStartTime": "2026-03-12T10:07:13.270Z",
+      "endTime": "2026-03-12T10:07:19.140Z",
+      "level": "DEFAULT",
+      "statusMessage": "",
+      "environment": "production",
+      "version": "1.50.0",
+      "bookmarked": false,
+      "public": false,
+      "createdAt": "2026-03-12T10:07:12.660Z",
+      "updatedAt": "2026-03-12T10:07:19.140Z",
+      "traceName": "devagent-step",
+      "traceMetadata": {
+        "team": "DevAgent",
+        "product": "coding-agent",
+        "env": "prod",
+        "data_class": "no_pii"
+      },
+      "traceTags": [
+        "agent",
+        "tool-use"
+      ],
+      "input": "[{\"role\": \"user\", \"content\": \"Write a unit test for the parse_amount helper.\"}]",
+      "output": "{\"role\": \"assistant\", \"content\": \"def test_parse_amount():\\n    assert parse_amount('1,50') == 1.5\"}",
+      "metadata": {
+        "litellm_call_id": "c6f87718-6d76-b07e-881e-d162ae2eb154",
+        "litellm_proxy_key_alias": "key-devagent-prod",
+        "request_id": "req-ec66a787-95e7-61d1-7731-af10506bf2ef"
+      },
+      "providedModelName": "gpt-5.4",
+      "internalModelId": "gpt-5.4",
+      "modelParameters": {
+        "temperature": 0.2,
+        "max_tokens": 1024,
+        "stream": true
+      },
+      "usageDetails": {
+        "input": 8120,
+        "output": 640,
+        "total": 8760
+      },
+      "inputUsage": 8120,
+      "outputUsage": 640,
+      "totalUsage": 8760,
+      "costDetails": {
+        "input": 0.0203,
+        "output": 0.0096,
+        "total": 0.0299
+      }
+    }
+  ],
+  "meta": {
+    "cursor": null
+  }
+}

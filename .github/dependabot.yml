@@ -1,0 +1,35 @@
+# Keeps the ecosystems this repo actually depends on current - GitHub Actions
+# and the Terraform provider constraints in every root/module that declares
+# them.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore(actions)"
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: "terraform"
+    directories:
+      - "/terraform/bootstrap"
+      - "/terraform/environments/dev"
+      - "/terraform/modules/*"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore(terraform)"
+    groups:
+      terraform-providers:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    # Provider majors are deliberate migrations, not routine bumps: every
+    # module and lock file caps aws at < 6.0.0.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]

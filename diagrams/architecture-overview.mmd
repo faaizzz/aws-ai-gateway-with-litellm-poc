@@ -1,0 +1,115 @@
+---
+config:
+  theme: neutral
+---
+%% Compact one-screen overview of the target-state architecture.
+%% This is a genuine simplification, not a shrunk copy of diagrams/architecture.mmd:
+%% it keeps only the gateway, both providers, the Langfuse-vs-Datadog observability
+%% split, the durable audit path, and where the onboarding module sits.
+%% See diagrams/architecture.mmd / architecture.md "detailed view" for full detail
+%% (all six teams, agentic/MCP tool broker, built/partial/target status per edge, etc).
+%% Target-state items (dashed, dimmed): External LLM Provider runtime wiring, Datadog,
+%% durable audit store. Built today: gateway, Bedrock, Langfuse Cloud, Postgres request
+%% log. Alerting and notification are Datadog target state.
+
+flowchart LR
+
+  %% Opaque white canvas so the diagram reads on GitHub dark mode (Mermaid cannot set a page background)
+  subgraph CANVAS[" "]
+  direction LR
+  LEGEND["<b>Legend</b><br/><div style='text-align:left;white-space:nowrap'><span style='display:inline-block;width:28px;height:14px;vertical-align:middle;margin-right:8px;outline:4px solid rgb(17,24,39);outline-offset:-4px;background:white'></span>Built, verified live<br/><span style='display:inline-block;width:28px;height:14px;vertical-align:middle;margin-right:8px;outline:2px dashed gray;outline-offset:-2px;background:white'></span>Target state only<br/><span style='display:inline-block;width:28px;height:14px;vertical-align:middle;margin-right:8px;outline:2px solid rgb(236,114,17);outline-offset:-2px;background:rgb(255,247,237)'></span>AWS service (with icon)<br/><span style='display:inline-block;width:28px;height:14px;vertical-align:middle;margin-right:8px;outline:2px solid rgb(75,85,99);outline-offset:-2px;background:rgb(243,244,246)'></span>Non-AWS component</div>"]
+
+  subgraph ONBOARD["Onboarding (control plane)"]
+    direction TB
+    TEAM(["Product team<br/>PR: usecases/&lt;id&gt;.yaml"])
+    CAT[("Approved model<br/>catalogue")]
+    MODULE["Onboarding: use-case +<br/>use-case-observability modules<br/>(per use case) + shared llm-gateway<br/>module - validates contract,<br/>provisions IAM/route/budget/obs config"]
+    TEAM --> MODULE
+    CAT -->|route + classification check| MODULE
+  end
+
+  CALLER(["Use-case caller<br/>e.g. AdvisorChat<br/>key in Secrets Manager (target)"])
+  SSO(["Employees via SSO (target)<br/>IdP group → team"])
+
+  GW{{"AI Gateway<br/>LiteLLM"}}
+
+  subgraph PROVIDERS["Model providers"]
+    direction TB
+    BR["Bedrock Frankfurt<br/>(EU)"]
+    EXT["External LLM Provider (target)<br/>direct API, ZDR<br/>fixed-IP egress"]
+    VPCE["Bedrock VPC endpoint (target)<br/>PrivateLink"]
+  end
+
+  subgraph OBS["Observability - two paths"]
+    direction TB
+    LF[("Langfuse<br/>traces + content")]
+    DD[("Datadog (target)<br/>derived metrics only<br/>alerts + notifications")]
+  end
+
+  subgraph AA["Audit"]
+    direction TB
+    AUDIT[("Postgres request log (built)<br/>durable audit store (target)")]
+  end
+  end
+
+  MODULE -.->|provisions IAM, route,<br/>budget, obs config| GW
+  CALLER e_call@-->|gateway key| GW
+  SSO -.->|target| GW
+  GW -.->|private path, target| VPCE
+  VPCE -.-> BR
+  GW e_bedrock@==>|approved route only| BR
+  GW -.->|approved route only, target| EXT
+  GW e_lf@-->|"trace + content"| LF
+  GW -.->|"derived metrics only, target"| DD
+  GW e_pg@-->|request/audit row| AUDIT
+
+  classDef control fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#451a03
+  classDef gw fill:#a5f3fc,stroke:#0e7490,stroke-width:3px,color:#083344
+  classDef prov fill:#fbcfe8,stroke:#be185d,stroke-width:2px,color:#500724
+  classDef trace fill:#ccfbf1,stroke:#0f766e,stroke-width:2px,color:#042f2e
+  classDef dd fill:#ede9fe,stroke:#632ca6,stroke-width:2px,color:#2e1065
+  classDef audit fill:#e9d5ff,stroke:#7e22ce,stroke-width:2px,color:#3b0764
+  classDef caller fill:#fde68a,stroke:#b45309,stroke-width:2px,color:#451a03
+
+  class TEAM,CAT,MODULE control
+  class GW gw
+  class BR,EXT,VPCE prov
+  class LF trace
+  class DD dd
+  class AUDIT audit
+  class CALLER,SSO caller
+
+  style CANVAS fill:#ffffff,stroke:none
+  style ONBOARD fill:#fffbeb,stroke:#f59e0b,stroke-width:2px
+  style PROVIDERS fill:#fdf2f8,stroke:#ec4899,stroke-width:2px
+  style OBS fill:#f0fdfa,stroke:#14b8a6,stroke-width:2px
+  style AA fill:#faf5ff,stroke:#7e22ce,stroke-width:2px
+
+  %% AWS (orange border + icon) vs non-AWS (grey box); declared last so they win on colour
+  classDef aws fill:#fff7ed,stroke:#ec7211,stroke-width:2px,color:#431407
+  classDef nonaws fill:#f3f4f6,stroke:#4b5563,stroke-width:2px,color:#111827
+  class BR,AUDIT,VPCE aws
+  class GW,EXT,LF,DD,SSO nonaws
+
+  classDef target stroke-dasharray:6 4,stroke-width:2px,opacity:0.55
+  class EXT,DD,VPCE,SSO target
+  classDef legendBox fill:#ffffff,stroke:#374151,stroke-width:1px,color:#111827
+  class LEGEND legendBox
+
+  %% Edge styling for built request flow
+  e_call@{ animate: true, animation: fast }
+  e_bedrock@{ animate: true, animation: fast }
+  e_pg@{ animate: true, animation: slow }
+  e_lf@{ animate: true, animation: slow }
+
+  %% Icons are drawn above these shapes after rendering (asci-doc/scripts/add-diagram-icons.mjs)
+  %% icon: MODULE icons/terraform.svg
+  %% icon: TEAM emoji:👩‍💻
+  %% icon: CAT emoji:📚
+  %% icon: CALLER emoji:📱
+  %% icon: GW icons/aws-fargate.svg
+  %% icon: LF emoji:🧵
+  %% icon: EXT emoji:🌍
+  %% icon: BR icons/aws-bedrock.svg
+  %% icon: DD icons/datadog.svg
+  %% icon: AUDIT icons/aws-rds.svg

@@ -1,0 +1,17 @@
+apiVersion: ai-platform.example.com/v1
+kind: AIUseCase
+
+metadata:
+  id: clashing-id
+  owner: owner-one
+  team: team-one
+
+spec:
+  dataClassification: internal
+  modelRoute: anthropic-claude-haiku-bedrock
+
+  budget:
+    monthlyUsd: 100
+
+  observability:
+    tier: minimal

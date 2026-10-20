@@ -1,0 +1,48 @@
+# Platform-owned model catalogue.
+
+routes:
+  anthropic-claude-sonnet-bedrock:
+    provider: bedrock
+    model_id: eu.anthropic.claude-sonnet-4-6 # repinned from the LEGACY 4-20250514 snapshot (see caveat above)
+    inference_profile: true
+    region: eu-central-1
+    profile_regions:
+      - eu-central-1
+      - eu-north-1
+      - eu-south-1
+      - eu-south-2
+      - eu-west-1
+      - eu-west-3
+    allowed_classifications:
+      - internal
+      - confidential
+
+  anthropic-claude-haiku-bedrock:
+    provider: bedrock
+    model_id: eu.anthropic.claude-haiku-4-5-20251001-v1:0
+    inference_profile: true
+    region: eu-central-1
+    profile_regions:
+      - eu-central-1
+      - eu-north-1
+      - eu-south-1
+      - eu-south-2
+      - eu-west-1
+      - eu-west-3
+    allowed_classifications:
+      - public
+      - internal
+      - confidential
+
+  external-llm-zdr:
+    provider: external
+    model_id: external-provider/gpt-5.4     # existing direct-API provider, ZDR agreement
+    inference_profile: false
+    region: null
+    profile_regions: []
+    credential: secretsmanager              # platform-managed secret, gateway-only
+    # Assumption: the external route is not approved for `confidential`
+    # because it sits outside the Bedrock/IAM boundary;
+    allowed_classifications:
+      - public
+      - internal

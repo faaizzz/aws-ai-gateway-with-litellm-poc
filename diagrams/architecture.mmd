@@ -1,0 +1,256 @@
+---
+config:
+  theme: neutral
+---
+%% Target-state architecture for self-service AI use-case onboarding.
+%% Control plane: PR -> CI -> use-case Terraform module establishes config.
+%% Data plane: caller/agent -> gateway -> approved provider/tool; gateway enforces at runtime.
+%% This is TARGET STATE, not only the demo deployment: it shows all six teams
+%% from data/sample_spend_30d.csv as gateway callers, agentic/MCP tool access, a
+%% durable audit store, Datadog derived metrics and self-hosted Langfuse.
+%% Nodes and edges are BUILT (solid, thick border - built and, per
+%% docs/demo-runtime-evidence.md, verified live in this PoC) or TARGET (dashed
+%% border, dimmed - designed in design.md, not built here).
+%% Laid out to fit one screen width: few nodes per row, merged where the detail
+%% lives in design.md or terraform/modules/*/README.md.
+
+flowchart LR
+
+  %% Opaque white canvas so the diagram reads on GitHub dark mode (Mermaid cannot set a page background)
+  subgraph CANVAS[" "]
+  direction LR
+  subgraph LEGEND["Legend"]
+    direction LR
+    L_BUILT["Built, verified live<br/>(solid, thick border)"]
+    L_TARGET["Target state only<br/>(dashed, dimmed)"]
+    L_AWS["AWS service<br/>(orange border, AWS icon)"]
+    L_NONAWS["Non-AWS component<br/>(grey box)"]
+    L_BUILT ~~~ L_TARGET ~~~ L_AWS ~~~ L_NONAWS
+  end
+
+  %% ---------------- Left column: control plane + what Terraform establishes ----------------
+  subgraph CTRL[" "]
+  direction TB
+  subgraph CP["Control plane - onboarding via Pull Request"]
+    direction TB
+    TEAMS(["Product teams<br/>one usecases/&lt;id&gt;.yaml each"])
+    DECL["advisor-chat.yaml + digestbot.yaml (built)<br/>kyc, dev-agent, research, marketing (target)"]
+    CAT[("approved-models.yaml<br/>platform-owned catalogue")]
+    MODULE_UC["use-case module<br/>validates contract, resolves route,<br/>computes IAM + key config"]
+    MODULE_OBS["use-case-observability<br/>AWS Budget alarm only<br/>(SNS topic, no subscriber)"]
+    MODULE_GW["llm-gateway (shared)<br/>ALB/ECS/RDS · master key ·<br/>Bedrock model_list"]
+    CI{{"GitHub Actions: fmt · validate · test · policy · plan<br/>→ platform review → terraform apply after merge<br/>⛔ PR blocked: unknown route · restricted · confidential→external · budget ≤ 0"}}
+
+    TEAMS -->|opens PR| DECL
+    DECL --> MODULE_UC & MODULE_OBS
+    CAT -->|route + classification check| MODULE_UC
+    CAT -.->|Bedrock routes only| MODULE_GW
+    MODULE_UC & MODULE_OBS & MODULE_GW --> CI
+  end
+
+  %% ---------------- What Terraform establishes ----------------
+  subgraph TF["Terraform-established configuration"]
+    direction TB
+    IAM["IAM on gateway task role<br/>bedrock:InvokeModel* on<br/>approved model only"]
+    KEY["Route-scoped virtual key<br/>per caller · attribution<br/>soft_budget 75%"]
+    MASTERKEY["Master key<br/>Secrets Manager,<br/>gateway only"]
+    ROUTE["LiteLLM model_list<br/>Bedrock routes only<br/>(external not wired)"]
+    BUDGET["AWS Budget (account-wide)<br/>75 · 90 · 100%"]
+    TARGETCFG["Target: tool allow-list +<br/>Datadog dashboard/monitors"]
+  end
+
+  CI ==>|apply| IAM & KEY & MASTERKEY & ROUTE & BUDGET & TARGETCFG
+  %% invisible links stack nodes in two rows so the diagram stays narrow
+  IAM ~~~ BUDGET
+  ROUTE ~~~ TARGETCFG
+
+  end
+
+  %% ---------------- Right column: runtime ----------------
+  subgraph RUN[" "]
+  direction TB
+  subgraph CALLERS["Callers (sample spend data)"]
+    direction TB
+    AC(["AdvisorChat<br/>confidential"])
+    DB(["DigestBot<br/>internal"])
+    OTHERS(["KYC · DevAgent · Research · Marketing<br/>(target)"])
+    CODEX(["Codex / internal agent<br/>own key + tool allow-list (target)"])
+    SSO(["Employees via SSO (target)<br/>IdP group → team · default no access<br/>no personal keys on confidential"])
+    APPKEY["Per-use-case gateway key (target)<br/>e.g. AdvisorChat · Secrets Manager<br/>read by that app task role only<br/>no provider key, no Bedrock IAM in the app"]
+  end
+
+
+  %% ---------------- Runtime data plane ----------------
+  subgraph RT["Runtime data plane - AWS eu-central-1"]
+    direction TB
+    WAF["AWS WAF · all callers<br/>per-IP rate limit · trusted CIDRs<br/>target: managed rules, bot control"]
+    ALB["ALB · HTTPS / ACM<br/>access logs → S3<br/>target: internal ALB, private subnets"]
+    subgraph GW["AI Gateway - LiteLLM on ECS Fargate"]
+      direction TB
+      AUTHN["authN: virtual key<br/>per use case or agent"]
+      AUTHZ["authZ · route pinning · spend check<br/>🚫 denies model override,<br/>unknown key, unauthorised tool"]
+      TOOLBROKER["Tool/MCP broker (target)<br/>allow-list · approval gate"]
+    end
+  end
+
+  MASTERKEY -.->|mints keys| KEY
+
+  AC e_ac@-->|request + key| WAF
+  DB e_db@-->|request + key| WAF
+  OTHERS -->|target| WAF
+  CODEX -->|target| WAF
+  SSO -.->|target| WAF
+  APPKEY -.->|injected as ECS secret, target| AC & DB & OTHERS & CODEX
+  WAF e_waf@--> ALB
+  ALB e_alb@--> AUTHN
+  AUTHN e_authn@--> AUTHZ
+  AUTHN -.->|brokered tool call, target| TOOLBROKER
+
+  %% ---------------- Destinations ----------------
+  subgraph PROV["Model providers"]
+    direction TB
+    BR["AWS Bedrock - EU profile<br/>Claude Sonnet/Haiku, 6 EU regions<br/>approved for confidential"]
+    EXT["External LLM Provider<br/>direct API · ZDR · target at runtime<br/>NOT approved for confidential"]
+    VPCE["Bedrock VPC endpoint (target)<br/>PrivateLink · endpoint policy on approved ARNs<br/>+ aws:SourceVpce on task role"]
+    EGRESS["Fixed-IP egress (target)<br/>NAT or proxy · domain allow-list"]
+  end
+
+  subgraph OB["Observability - two separate paths"]
+    direction TB
+    LF_CLOUD[("Langfuse Cloud (EU)<br/>demo stand-in, synthetic prompts")]
+    LF_SELF[("Self-hosted Langfuse (target)<br/>full traces, all teams")]
+    DD["Datadog (target)<br/>derived metrics ONLY, tagged team ·<br/>use_case_id · route · provider<br/>no prompts · no PII"]
+    ALERT["Datadog alerts + notifications (target)<br/>budget 75 · 90% · SLO burn-rate<br/>page vs ticket, to the owning team"]
+  end
+
+  subgraph AUD["Audit and tools"]
+    direction TB
+    PG[("RDS Postgres request log<br/>keys · spend · metadata")]
+    AUDITSTORE[("Durable audit store (target)<br/>confidential ≥ 180d")]
+    MCP["MCP / tool servers (target)<br/>read_only · data_egress · destructive"]
+  end
+
+  AUTHZ e_bedrock@==>|approved route only| BR
+  AUTHZ -. blocked for confidential; not wired, target .-x EXT
+  AUTHZ e_pg@--> PG
+  AUTHZ e_lf@-->|trace + content| LF_CLOUD
+  AUTHZ -.->|target| LF_SELF
+  AUTHZ -.->|derived metrics, target| DD
+  TOOLBROKER -.->|brokered call, target| MCP
+  TOOLBROKER -.->|forensic log, target| PG
+  PG -.->|retention, target| AUDITSTORE
+  DD -.-> ALERT
+  AUTHZ -.->|private path, target| VPCE
+  VPCE -.->|target| BR
+  AUTHZ -.->|only internet route, target| EGRESS
+  EGRESS -.->|target| EXT
+  BR ~~~ EXT
+  LF_CLOUD ~~~ LF_SELF
+  PG ~~~ MCP
+
+  end
+  end
+
+  CTRL ==>|gateway task IAM role · model_list · budget thresholds<br/>route-scoped virtual keys issued per caller| RUN
+
+  %% ---------------- Category styles ----------------
+  classDef team fill:#fde68a,stroke:#b45309,stroke-width:2px,color:#451a03
+  classDef decl fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#451a03
+  classDef ci fill:#ddd6fe,stroke:#6d28d9,stroke-width:2px,color:#2e1065
+  classDef bad fill:#fecaca,stroke:#b91c1c,stroke-width:2px,color:#450a0a
+  classDef tf fill:#c7d2fe,stroke:#4338ca,stroke-width:2px,color:#1e1b4b
+  classDef money fill:#fed7aa,stroke:#c2410c,stroke-width:2px,color:#431407
+  classDef gw fill:#a5f3fc,stroke:#0e7490,stroke-width:3px,color:#083344
+  classDef net fill:#e0f2fe,stroke:#0369a1,stroke-width:2px,color:#082f49
+  classDef db fill:#e9d5ff,stroke:#7e22ce,stroke-width:2px,color:#3b0764
+  classDef prov fill:#fbcfe8,stroke:#be185d,stroke-width:2px,color:#500724
+  classDef trace fill:#ccfbf1,stroke:#0f766e,stroke-width:2px,color:#042f2e
+  classDef dd fill:#ede9fe,stroke:#632ca6,stroke-width:2px,color:#2e1065
+  classDef agent fill:#fee2e2,stroke:#991b1b,stroke-width:2px,color:#450a0a
+  classDef mcp fill:#f5f3ff,stroke:#5b21b6,stroke-width:2px,color:#2e1065
+  classDef aws fill:#fff7ed,stroke:#ec7211,stroke-width:2px,color:#431407
+  classDef nonaws fill:#f3f4f6,stroke:#4b5563,stroke-width:2px,color:#111827
+  classDef legendBox fill:#ffffff,stroke:#374151,stroke-width:1px,color:#111827
+
+  class TEAMS,AC,DB,OTHERS team
+  class DECL decl
+  class CAT,PG,AUDITSTORE db
+  class MODULE_UC,MODULE_OBS,MODULE_GW,CI ci
+  class IAM,MASTERKEY,KEY,ROUTE,TARGETCFG tf
+  class BUDGET,ALERT money
+  class AUTHN,AUTHZ,TOOLBROKER gw
+  class ALB,WAF net
+  class BR,EXT,VPCE,EGRESS prov
+  class LF_CLOUD,LF_SELF trace
+  class DD dd
+  class CODEX,SSO agent
+  class MCP mcp
+  class L_BUILT,L_TARGET legendBox
+  class L_AWS aws
+  class L_NONAWS nonaws
+  %% AWS vs non-AWS treatment (after category classes so it wins on fill/stroke colour)
+  class ALB,WAF,PG,BR,MASTERKEY,IAM,BUDGET,VPCE,APPKEY aws
+  class CI,AUTHN,AUTHZ,TOOLBROKER,MCP,EXT,LF_CLOUD,LF_SELF,DD,ALERT,SSO,EGRESS nonaws
+
+  style CANVAS fill:#ffffff,stroke:none
+  style CTRL fill:none,stroke:none
+  style RUN fill:none,stroke:none
+  style LEGEND fill:#f9fafb,stroke:#374151,stroke-width:1px
+  style CP fill:#fffbeb,stroke:#f59e0b,stroke-width:2px
+  style TF fill:#eef2ff,stroke:#6366f1,stroke-width:2px
+  style RT fill:#ecfeff,stroke:#06b6d4,stroke-width:2px
+  style GW fill:#cffafe,stroke:#0e7490,stroke-width:2px
+  style PROV fill:#fdf2f8,stroke:#ec4899,stroke-width:2px
+  style OB fill:#f0fdfa,stroke:#14b8a6,stroke-width:2px
+  style AUD fill:#faf5ff,stroke:#7e22ce,stroke-width:2px
+  style CALLERS fill:#fffbeb,stroke:#b45309,stroke-width:1px
+
+  %% ---------------- Built vs target overlay (drawn after category styles) ----------------
+  classDef built stroke-width:4px
+  classDef target stroke-dasharray:6 4,stroke-width:2px,opacity:0.55
+
+  class TEAMS,DECL,CAT,MODULE_UC,MODULE_OBS,MODULE_GW,CI built
+  class IAM,MASTERKEY,KEY,ROUTE,BUDGET,AC,DB built
+  class WAF,ALB,AUTHN,AUTHZ,PG,BR,LF_CLOUD built
+  class SSO,APPKEY,VPCE,EGRESS,OTHERS,CODEX,TARGETCFG,TOOLBROKER,MCP,AUDITSTORE,EXT,LF_SELF,DD,ALERT target
+  class L_BUILT built
+  class L_TARGET target
+
+  %% Edge styling for built request flow
+  e_ac@{ animate: true, animation: fast }
+  e_db@{ animate: true, animation: fast }
+  e_waf@{ animate: true, animation: fast }
+  e_alb@{ animate: true, animation: fast }
+  e_authn@{ animate: true, animation: fast }
+  e_bedrock@{ animate: true, animation: fast }
+  e_pg@{ animate: true, animation: slow }
+  e_lf@{ animate: true, animation: slow }
+
+  %% Icons are drawn above these shapes after rendering (asci-doc/scripts/add-diagram-icons.mjs)
+  %% icon: MODULE_UC icons/terraform.svg
+  %% icon: MODULE_OBS icons/terraform.svg
+  %% icon: MODULE_GW icons/terraform.svg
+  %% icon: CI icons/github-actions.svg
+  %% icon: IAM icons/aws-iam.svg
+  %% icon: MASTERKEY icons/aws-secrets-manager.svg
+  %% icon: BUDGET icons/aws-sns.svg
+  %% icon: WAF emoji:🛡️
+  %% icon: ALB icons/aws-alb.svg
+  %% icon: GW icons/aws-fargate.svg
+  %% icon: BR icons/aws-bedrock.svg
+  %% icon: DD icons/datadog.svg
+  %% icon: PG icons/aws-rds.svg
+  %% icon: TEAMS emoji:👩‍💻
+  %% icon: DECL emoji:📄
+  %% icon: CAT emoji:📚
+  %% icon: KEY emoji:🔑
+  %% icon: ROUTE emoji:🧭
+  %% icon: TARGETCFG emoji:🧰
+  %% icon: TOOLBROKER emoji:🧰
+  %% icon: EXT emoji:🌍
+  %% icon: LF_CLOUD emoji:🧵
+  %% icon: LF_SELF emoji:🧵
+  %% icon: ALERT emoji:🔔
+  %% icon: APPKEY icons/aws-secrets-manager.svg
+  %% icon: SSO emoji:🪪
+  %% icon: EGRESS emoji:🚪

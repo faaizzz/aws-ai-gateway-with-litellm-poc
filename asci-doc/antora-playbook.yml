@@ -1,0 +1,19 @@
+site:
+  title: AI Gateway with LiteLLM (PoC)
+  start_page: ai-gateway::index.adoc
+antora:
+  extensions:
+    - '@antora/lunr-extension'
+content:
+  sources:
+    - url: ..
+      start_path: asci-doc/docs
+      branches: HEAD
+      edit_url: false
+ui:
+  bundle:
+    url: https://gitlab.com/antora/antora-ui-default/-/jobs/artifacts/HEAD/raw/build/ui-bundle.zip?job=bundle-stable
+    snapshot: true
+  supplemental_files: ./supplemental-ui
+output:
+  dir: ./build/site

@@ -1,0 +1,10 @@
+name: ai-gateway
+title: AI Gateway with LiteLLM (PoC)
+version: ~
+nav:
+  - modules/ROOT/nav.adoc
+asciidoc:
+  attributes:
+    idprefix: ''
+    idseparator: '-'
+    repo-url: https://github.com/faaizzz/aws-ai-gateway-with-litellm-poc

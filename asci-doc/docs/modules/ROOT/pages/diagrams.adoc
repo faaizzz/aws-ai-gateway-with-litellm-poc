@@ -1,0 +1,19 @@
+= Diagrams
+
+Target-state architecture. Both diagrams are rendered from their Mermaid sources during the site build.
+
+== Overview
+
+One screen: the gateway, both providers, Langfuse traces versus Datadog derived metrics, and where the Terraform modules sit.
+
+image::architecture-overview.svg[Target-state architecture overview,role=diagram]
+
+Source: {repo-url}/blob/main/diagrams/architecture-overview.mmd[architecture-overview.mmd]
+
+== Detailed
+
+Six teams, the agentic/MCP path, and the built/partial/target legend.
+
+image::architecture.svg[Detailed target-state architecture,role=diagram]
+
+Source: {repo-url}/blob/main/diagrams/architecture.mmd[architecture.mmd]

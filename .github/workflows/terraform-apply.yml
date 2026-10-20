@@ -1,0 +1,107 @@
+name: terraform apply (manual)
+
+# This is the actual apply gate for this repo.
+on:
+  workflow_dispatch:
+    inputs:
+      plan_run_id:
+        description: >-
+          Run ID of a completed terraform.yml run (job: plan) on main whose
+          tfplan-dev artifact to apply. Find candidates with:
+          gh run list --workflow=terraform.yml --branch=main --json
+          databaseId,conclusion,headSha,createdAt,url
+        required: true
+        type: string
+
+permissions:
+  id-token: write # required for OIDC to AWS (aws-actions/configure-aws-credentials)
+  contents: read
+  actions: read # required to download an artifact from a run other than this one
+
+env:
+  # Keep in sync with terraform.yml's TF_VERSION.
+  TF_VERSION: "1.16.4"
+
+jobs:
+  apply:
+    name: "terraform apply (gated: manual dispatch + referenced plan run)"
+    runs-on: ubuntu-latest
+    # Safety net named explicitly in the issue, kept even though
+    # workflow_dispatch already can't be triggered by a PR branch push:
+    # this still refuses to run if someone.
+    if: github.ref == 'refs/heads/main'
+    # Real protection this environment has today: a deployment branch
+    # policy restricting it to `main`.
+    environment: dev-apply
+    env:
+      TF_VAR_langfuse_public_key: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+      TF_VAR_langfuse_secret_key: ${{ secrets.LANGFUSE_SECRET_KEY }}
+      TF_VAR_langfuse_host: ${{ vars.LANGFUSE_HOST }}
+      # Same reasoning as terraform.yml's plan/apply env: an unset
+      # repository variable becomes TF_VAR_ci_*_role_arn="".
+      TF_VAR_ci_plan_role_arn: ${{ secrets.AWS_PLAN_ROLE_ARN }}
+      TF_VAR_ci_apply_role_arn: ${{ secrets.AWS_APPLY_ROLE_ARN }}
+      # JSON list of stable operator IAM ARNs allowed to read the secrets.
+      # Falls back to [] because an unset variable would render an empty string,
+      # which is not a valid list(string). GitHub upper-cases variable names;
+      # Terraform needs the lower-case TF_VAR_ name.
+      TF_VAR_local_operator_arns: ${{ vars.LOCAL_OPERATOR_ARNS || '[]' }}
+    steps:
+      # Fail closed before touching any AWS credentials if the human
+      # supplied a run ID that isn't actually a successful terraform.yml
+      # run on main - e.g.
+      - name: Verify referenced run is a successful plan on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ inputs.plan_run_id }}
+        run: |
+          set -euo pipefail
+          run_json="$(gh api "repos/${REPO}/actions/runs/${RUN_ID}")"
+          workflow_path="$(echo "$run_json" | jq -r '.path')"
+          head_branch="$(echo "$run_json" | jq -r '.head_branch')"
+          head_sha="$(echo "$run_json" | jq -r '.head_sha')"
+          conclusion="$(echo "$run_json" | jq -r '.conclusion')"
+          echo "Referenced run ${RUN_ID}: workflow=${workflow_path} branch=${head_branch} sha=${head_sha} conclusion=${conclusion}"
+
+          if [ "$workflow_path" != ".github/workflows/terraform.yml" ]; then
+            echo "::error::plan_run_id ${RUN_ID} is not a run of terraform.yml (got ${workflow_path})"
+            exit 1
+          fi
+          if [ "$head_branch" != "main" ]; then
+            echo "::error::plan_run_id ${RUN_ID} did not run on main (got ${head_branch})"
+            exit 1
+          fi
+          if [ "$conclusion" != "success" ]; then
+            echo "::error::plan_run_id ${RUN_ID} did not conclude successfully (got ${conclusion})"
+            exit 1
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ secrets.AWS_APPLY_ROLE_ARN }}
+          aws-region: eu-central-1
+      # Downloads the exact plan file the referenced run produced -
+      # never a fresh plan+apply.
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: tfplan-dev
+          path: terraform/environments/dev
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.plan_run_id }}
+      - run: terraform -chdir=terraform/environments/dev init
+      # Applies the saved plan file itself, not a fresh plan+apply - if
+      # the remote state changed since that plan ran.
+      - run: terraform -chdir=terraform/environments/dev apply tfplan
+      # Same check as terraform.yml's plan job, run here against the
+      # actual post-apply STATE - the half of the acceptance criterion a
+      # plan-only check can't cover.
+      - run: |
+          terraform -chdir=terraform/environments/dev show -json > state.json
+          scripts/ci/check_no_secret_material_in_plan.sh state.json
+      # A post-apply idempotency check - the quota resource showed a
+      # permanent 10 -> 10000 diff for a while before anyone noticed.
+      - run: terraform -chdir=terraform/environments/dev plan -detailed-exitcode -no-color

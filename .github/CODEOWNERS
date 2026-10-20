@@ -1,0 +1,2 @@
+# Use-case declarations are the platform contract: every change needs the platform owner's review.
+/usecases/ @<platform-owner>

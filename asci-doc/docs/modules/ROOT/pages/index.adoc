@@ -1,0 +1,13 @@
+= AI Gateway with LiteLLM (PoC)
+
+Documentation for a proof of concept: a governed AI gateway platform and a self-service, Terraform-based onboarding path for new LLM use cases, demonstrated on AdvisorChat.
+
+This site is built from the Markdown in the https://github.com/faaizzz/aws-ai-gateway-with-litellm-poc[repository]. The Markdown is the source of truth.
+
+== Where to start
+
+* xref:repo/design.adoc[Design]: cost governance, the platform contract and its lifecycle, tool safety, observability, model sourcing.
+* xref:repo/overview.adoc[Repo overview]: what was built, how to run it, the AdvisorChat demo.
+* xref:repo/architecture.adoc[Architecture] and xref:diagrams.adoc[Diagrams]: the target-state picture.
+* xref:repo/module-use-case.adoc[use-case module]: the onboarding module and its guarantees.
+* xref:repo/known-limitations.adoc[Known limitations] and xref:repo/demo-runtime-evidence.adoc[Demo evidence].

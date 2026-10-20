@@ -1,0 +1,13 @@
+# TEST FIXTURE ONLY - never referenced by any real use-case declaration or the
+# production catalogue.
+
+routes:
+  hypothetical-non-eu-confidential-fixture:
+    provider: bedrock
+    model_id: us.anthropic.claude-fixture-not-a-real-model
+    inference_profile: true
+    region: us-east-1
+    profile_regions:
+      - us-east-1
+    allowed_classifications:
+      - confidential

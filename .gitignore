@@ -1,0 +1,29 @@
+# Local environment / credentials
+.env.aws
+.env.datadog
+.env.langfuse
+.env.doc
+.env
+*.tfvars
+
+# Terraform state and local artifacts
+**/.terraform/
+*.tfstate
+*.tfstate.backup
+crash.log
+crash.*.log
+
+# Python (tests/policy/*.py)
+__pycache__/
+*.pyc
+
+# Agent tooling (local only, not a deliverable)
+.agents/
+skills-lock.json
+docs/aws-resources.md
+
+# Antora site (generated in CI / by asci-doc/scripts/build.sh)
+asci-doc/node_modules/
+asci-doc/build/
+asci-doc/docs/modules/ROOT/pages/repo/
+asci-doc/docs/modules/ROOT/images/

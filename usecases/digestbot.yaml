@@ -1,0 +1,22 @@
+# Product team's self-service contract for DigestBot.
+
+apiVersion: ai-platform.example.com/v1
+kind: AIUseCase
+
+metadata:
+  id: digestbot
+  owner: digest-platform
+  team: digestbot          # canonical team identifier; historical data labels it "DigestBot"
+
+spec:
+  dataClassification: internal
+
+  modelRoute: anthropic-claude-haiku-bedrock
+
+  budget:
+    monthlyUsd: 2500        # ASSUMPTION: ~48% above the observed $1,691.28 30-day
+                            # spend in data/sample_spend_30d.csv (claude-haiku-4-5). Not an
+                            # approved business budget - see README.md "Budget model".
+
+  observability:
+    tier: standard

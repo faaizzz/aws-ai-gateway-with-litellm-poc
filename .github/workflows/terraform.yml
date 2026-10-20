@@ -1,0 +1,178 @@
+name: terraform
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "terraform/**"
+      - "usecases/**"
+      - "tests/**"
+      - "data/**"
+      - ".github/workflows/terraform.yml"
+  push:
+    branches: [main]
+    paths:
+      - "terraform/**"
+      - "usecases/**"
+      - "tests/**"
+      - "data/**"
+      - ".github/workflows/terraform.yml"
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write # required for OIDC to AWS (aws-actions/configure-aws-credentials)
+  contents: read
+
+env:
+  # >= 1.10.0 is the floor pinned by
+  # terraform/environments/dev/providers.tf.
+  TF_VERSION: "1.16.4"
+
+jobs:
+  fmt:
+    name: terraform fmt -check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+      - run: terraform fmt -check -recursive -diff
+
+  validate:
+    name: terraform validate (dev environment)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+      # Backend-less init: validate does not need real state or AWS credentials.
+      - run: terraform -chdir=terraform/environments/dev init -backend=false
+      - run: terraform -chdir=terraform/environments/dev validate -no-color
+
+  validate-example:
+    name: terraform validate (module examples/minimal)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+      # Proves the module's documented "smallest valid call" actually
+      # stays valid as the module's own interface evolves - backend-
+      # less.
+      - run: terraform -chdir=terraform/modules/use-case/examples/minimal init -backend=false
+      - run: terraform -chdir=terraform/modules/use-case/examples/minimal validate -no-color
+
+  test:
+    name: terraform test (contract, IAM, gateway config)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+      # No AWS credentials needed: tests/terraform/*.tftest.hcl
+      # configure the aws provider with fake static keys and skip_*
+      # validation flags.
+      - run: terraform init -test-directory=tests/terraform
+      - run: terraform test -test-directory=tests/terraform -no-color
+
+  policy-tests:
+    name: policy tests (spend data-quality, usecase schema, doc path refs)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: python3 tests/policy/spend_quality_checks.py
+      - run: python3 tests/policy/usecase_schema_checks.py
+      - run: python3 tests/policy/doc_path_refs.py
+
+  tflint:
+    name: tflint --recursive
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: terraform-linters/setup-tflint@1cf010d3c7aef302051ccdb68c14c5dc2efa34ef # v6.3.1
+        with:
+          tflint_version: v0.64.0
+      # Source, not a Terraform provider, so this is unrelated to the
+      # backend-less `terraform init` the validate/test jobs run.
+      # Downloads the AWS ruleset declared in .tflint.hcl - a plugin
+      - run: tflint --init
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - run: tflint --recursive --format compact
+
+  trivy:
+    name: trivy config (fails on HIGH/CRITICAL)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Accepted PoC deviations (default VPC, public ALB with only a WAF rate limit,
+      # broad gateway-task egress with no NAT/VPC endpoints, RDS's low
+      # backup-retention default.
+      # KMS keys) are each recorded with an inline `# trivy:ignore:<ID>`
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: config
+          scan-ref: terraform
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+
+  plan:
+    name: terraform plan (dev environment)
+    runs-on: ubuntu-latest
+    needs: [fmt, validate, validate-example, test, policy-tests, tflint, trivy]
+    # Skipped unless the repository variable AWS_PLAN_ENABLED is "true"
+    # (set it once terraform/bootstrap is applied and the role secrets
+    # exist). The `secrets` context is unavailable in job-level
+    # conditions, so a variable is the gate.
+    if: vars.AWS_PLAN_ENABLED == 'true'
+    env:
+      # Langfuse Cloud project keys:
+      # terraform/environments/dev/variables.tf declares these as
+      # required variables with no default, so plan/apply fail without
+      # them.
+      TF_VAR_langfuse_public_key: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+      TF_VAR_langfuse_secret_key: ${{ secrets.LANGFUSE_SECRET_KEY }}
+      TF_VAR_langfuse_host: ${{ vars.LANGFUSE_HOST }}
+      # CI role ARNs for the gateway key's Secrets Manager resource
+      # policy.
+      TF_VAR_ci_plan_role_arn: ${{ secrets.AWS_PLAN_ROLE_ARN }}
+      TF_VAR_ci_apply_role_arn: ${{ secrets.AWS_APPLY_ROLE_ARN }}
+      # JSON list of stable operator IAM ARNs allowed to read the secrets.
+      # Falls back to [] because an unset variable would render an empty string,
+      # which is not a valid list(string). GitHub upper-cases variable names;
+      # Terraform needs the lower-case TF_VAR_ name.
+      TF_VAR_local_operator_arns: ${{ vars.LOCAL_OPERATOR_ARNS || '[]' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+      # AWS_PLAN_ROLE_ARN is the github-actions-plan role from
+      # terraform/bootstrap.
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ secrets.AWS_PLAN_ROLE_ARN }}
+          aws-region: eu-central-1
+      - run: terraform -chdir=terraform/environments/dev init
+      # Saves the plan to a file and uploads it as a workflow artifact
+      # so a manually-dispatched terraform-apply.yml run can apply this
+      # EXACT plan.
+      - run: terraform -chdir=terraform/environments/dev plan -no-color -out=tfplan
+      # The gateway master/salt keys are written via secret_string_wo,
+      # specifically so this uploaded plan artifact never carries key
+      # material.
+      - run: |
+          terraform -chdir=terraform/environments/dev show -json tfplan > tfplan.json
+          scripts/ci/check_no_secret_material_in_plan.sh tfplan.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: tfplan-dev
+          path: terraform/environments/dev/tfplan
+          retention-days: 1
+          if-no-files-found: error
+
+  # Apply is intentionally NOT a job in this workflow.
